@@ -1,0 +1,13 @@
+services:
+  twilight-wars-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      BOT_APPLICATION_ID: ${BOT_APPLICATION_ID}
+      BOT_APPLICATION_SECRET: ${BOT_APPLICATION_SECRET}
+    volumes:
+      - type: bind
+        source: ./vol_bot
+        target: /var/twilight-wars-bot
