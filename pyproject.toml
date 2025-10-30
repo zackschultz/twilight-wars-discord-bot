@@ -1,0 +1,36 @@
+[project]
+name = "twilight-wars-bot"
+version = "0.1"
+dependencies = [
+    "async-lru<2.1",
+    "attrs==25.4.0",
+    "discord.py<2.7",
+    "requests<3",
+    "types-requests",
+    "structlog==24.2.0",
+    # Twilight wars uses an older version of SocketIO, so we need to pin to the
+    # 4.x series
+    #
+    # See https://stackoverflow.com/a/68348977/703040
+    "python-socketio[asyncio_client]<5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "mypy",
+]
+
+[tool.pyright]
+venvPath = "."
+venv = "venv"
+pythonVersion = "3.14"
+pythonPlatform = "Linux"
+
+[[tool.mypy.overrides]]
+module = "socketio"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "socketio.exceptions"
+ignore_missing_imports = true
