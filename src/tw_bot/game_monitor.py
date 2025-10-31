@@ -11,7 +11,6 @@ from typing import Any, Awaitable, Callable
 import attrs
 import requests
 import structlog
-import websockets
 
 from . import twilight_wars_client
 
@@ -391,6 +390,31 @@ class TWGameMonitor:
         # Finally, return an idle "handle" that can be used to detect if
         # data is changing while the system is seemingly idle.
         return summary.gen
+
+    async def tw_refresh_and_get_turn(self) -> ActivePlayerChangeEvent | None:
+        b_logger = logger.bind(game_id=self.game_id, channel_id=self.channel_id)
+        b_logger.info("Received re-notify request")
+        # Attempt to get the current game summary
+        try:
+            summary = await twilight_wars_client.get_summary(self.game_id, self.session)
+        except Exception as err:
+            b_logger.exception(
+                "Unable to get game summary",
+                err_msg=str(err),
+            )
+            return None
+        # Then generate a synthetic event
+        try:
+            turn = twilight_wars_client.TWTurnStatus.from_game_summary(summary)
+            event = twilight_wars_client.NormalizedTWEvent(turn, [])
+        except Exception as err:
+            b_logger.exception(
+                "Exception generating synthetic event",
+                err_msg=str(err),
+                summary=summary,
+            )
+            return None
+        return await self._tw_event_to_active_player_change_event(event)
 
     async def _tw_event_to_active_player_change_event(
         self, event: twilight_wars_client.NormalizedTWEvent
