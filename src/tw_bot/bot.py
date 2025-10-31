@@ -28,6 +28,7 @@ class DiscordClient(discord.Client):
         self.tree.add_command(reconnect_command, override=True)
         self.tree.add_command(connect_player_command, override=True)
         self.tree.add_command(disconnect_player_command, override=True)
+        self.tree.add_command(re_notify, override=True)
 
     async def on_ready(self):
         logger.info(f"Logged on as {self.user}!")
@@ -293,6 +294,50 @@ async def disconnect_player_command(
     )
 
 
+@app_commands.command(
+    name="renotify",
+    description="Posts current turn information, re-notifying the current player 🛎️",
+)
+async def re_notify(
+    interaction: discord.Interaction,
+):
+    """Process to re post the current turn.
+
+    This will check the current turn and re-post the turn details. If a user is
+    configured to receive notifications for the current player, they will be
+    tagged.
+
+    The command has two main purposes. The first is to prod someone who might be
+    taking too long to complete their turn. The second is help if the bot is
+    somehow stuck.
+
+    This is potentially ripe for abuse, but I'm going to assume that no one will
+    be an absolute jerk about it. There are currently no limits on how often
+    this can be used. It will indicate WHO trigger the ping, so if they are
+    rude you can always shame them.
+    """
+    if not (channel_id := interaction.channel_id):
+        await interaction.response.send_message(
+            f"This command can only be run from a channel", ephemeral=True
+        )
+        return
+    interaction.user.id
+    monitor = monitors[channel_id]
+    event = await monitor.tw_refresh_and_get_turn()
+    if not event:
+        await interaction.response.send_message(
+            f"Unable to get the current turn information", ephemeral=True
+        )
+        return
+    await on_game_monitor_event(
+        client=cast(DiscordClient, interaction.client),
+        monitor=monitor,
+        event=event,
+        originator=interaction.user,
+    )
+    return
+
+
 def run(*, application_id: int, application_secret: str) -> None:
     """Runs the bot, blocking until the interrupted"""
     logger.info("Starting asyncio event loop")
@@ -352,6 +397,7 @@ async def on_game_monitor_event(
     client: DiscordClient,
     monitor: game_monitor.TWGameMonitor,
     event: game_monitor.GameMonitorEvent,
+    originator: discord.User | discord.Member | None = None
 ):
     """Handles messages from the game monitor.
 
@@ -363,9 +409,15 @@ async def on_game_monitor_event(
     b_logger.info("Bot received turn event", tw_event=event)
     channel = client.get_channel(monitor.channel_id)
     assert isinstance(channel, discord.channel.TextChannel)
+    message_parts = [
+        f"{event.active_player_handle} ({event.active_player_faction}),",
+        "you're up:",
+        f"[{event.instruction}](https://www.twilightwars.com/games/{event.game_id})",
+    ]
+    if originator:
+        message_parts.append(f"(🛎️ from <@{originator.id}>)")
     await channel.send(
-        f"{event.active_player_handle} ({event.active_player_faction}), you're up: "
-        + f"[{event.instruction}](https://www.twilightwars.com/games/{event.game_id})",
+        " ".join(message_parts),
         suppress_embeds=True,
         allowed_mentions=discord.AllowedMentions(users=True),
     )
