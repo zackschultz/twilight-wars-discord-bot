@@ -329,11 +329,10 @@ async def re_notify(
             f"Unable to get the current turn information", ephemeral=True
         )
         return
-    await on_game_monitor_event(
-        client=cast(DiscordClient, interaction.client),
-        monitor=monitor,
-        event=event,
-        originator=interaction.user,
+    await interaction.response.send_message(
+        await make_event_message(event, originator=interaction.user),
+        suppress_embeds=True,
+        allowed_mentions=discord.AllowedMentions(users=True),
     )
     return
 
@@ -397,7 +396,6 @@ async def on_game_monitor_event(
     client: DiscordClient,
     monitor: game_monitor.TWGameMonitor,
     event: game_monitor.GameMonitorEvent,
-    originator: discord.User | discord.Member | None = None
 ):
     """Handles messages from the game monitor.
 
@@ -409,6 +407,17 @@ async def on_game_monitor_event(
     b_logger.info("Bot received turn event", tw_event=event)
     channel = client.get_channel(monitor.channel_id)
     assert isinstance(channel, discord.channel.TextChannel)
+    await channel.send(
+        await make_event_message(event),
+        suppress_embeds=True,
+        allowed_mentions=discord.AllowedMentions(users=True),
+    )
+
+
+async def make_event_message(
+    event: game_monitor.GameMonitorEvent,
+    originator: discord.User | discord.Member | None = None,
+) -> str:
     message_parts = [
         f"{event.active_player_handle} ({event.active_player_faction}),",
         "you're up:",
@@ -416,8 +425,6 @@ async def on_game_monitor_event(
     ]
     if originator:
         message_parts.append(f"(🛎️ from <@{originator.id}>)")
-    await channel.send(
-        " ".join(message_parts),
-        suppress_embeds=True,
-        allowed_mentions=discord.AllowedMentions(users=True),
-    )
+    return " ".join(message_parts)
+
+
