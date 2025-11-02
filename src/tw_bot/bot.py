@@ -426,5 +426,3 @@ async def make_event_message(
     if originator:
         message_parts.append(f"(🛎️ from <@{originator.id}>)")
     return " ".join(message_parts)
-
-
